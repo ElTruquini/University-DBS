@@ -20,8 +20,8 @@ drop trigger if exists courses_ignore_duplicates_trigger on courses;
 drop function if exists faculty_ignore_duplicates();
 drop trigger if exists faculty_ignore_duplicates_trigger on faculty;
 drop function if exists insert_grades(course varchar, term varchar, student_id varchar, grade integer);
-drop function if exists enrolled_ignore_duplicates();
-drop trigger if exists enrolled_ignore_duplicates_trigger on enrolled;
+drop function if exists enrolled_validations();
+drop trigger if exists enrolled_validations_trigger on enrolled;
 
 
 -- create Student table --
@@ -153,26 +153,17 @@ create trigger faculty_ignore_duplicates_trigger
 	for each row
 	execute procedure faculty_ignore_duplicates();
 
---Enrolled insertion, ignore duplicates
-create or replace function enrolled_ignore_duplicates()
-returns trigger as
-$BODY$
-begin 
-	if (select count(*)
-		from enrolled
-		where s_id = new.s_id and course_code = new.course_code and term = new.term) > 0
-	then
-		return null;
-	end if;
-return new;
-end 
-$BODY$
-language plpgsql;
 
-create trigger enrolled_ignore_duplicates_trigger
-	before insert on enrolled
-	for each row
-	execute procedure enrolled_ignore_duplicates();
+
+
+
+
+
+
+
+
+
+
 
 --Enrolled insertion, not enough space
 create or replace function enrolled_check_capacity()
@@ -193,7 +184,7 @@ begin
 	if 
 		curr_capacity < max_capacity
 	then
-		raise notice 'Course insertion % capacity OK - %: CURR_CAP:% | MAX_CAP:%', new.course_code, new.s_id, curr_capacity, max_capacity;
+--		raise notice 'Course insertion % capacity OK - %: CURR_CAP:% | MAX_CAP:%', new.course_code, new.s_id, curr_capacity, max_capacity;
 		return new;
 	else
 		raise exception 'Course insertion % capacity exceeded - %: CURR_CAP:% | MAX_CAP:%', new.course_code, new.s_id, curr_capacity, max_capacity;
@@ -211,13 +202,6 @@ create trigger enrolled_check_capacity_trigger
 
 --****TODO: trigger for assigning grades when there is no enrolled
 
-
-
-
-
-
-
-
 --*****Is there a way to avoid duplicating function for when additional argument prereq is given???
 --insert_courses(): INCLUDING prerequisite argument--
 create or replace function insert_courses(course_id varchar, course_name varchar, offering_term varchar, f_name varchar, max_cap integer, variadic prereq varchar[])
@@ -230,20 +214,17 @@ begin
 	insert into faculty(f_name)
 		values($4);
 	select faculty.f_id into instructor_id from faculty where faculty.f_name = $4;
-	raise notice 'Instructor insertion:%', instructor_id;
-
+--	raise notice 'Instructor insertion:%', instructor_id;
 	insert into courses(course_code)
 		values($1);
-	raise notice 'Course insertion:%', $1;
-
+--	raise notice 'Course insertion:%', $1;
 	insert into offering(course_code, course_name, term, f_id, max_cap)
 		values($1, $2, $3, instructor_id, $5);
-
 	select array_length($6,1) into opts;
-	raise notice 'optional args:%', opts;
+--	raise notice 'optional args:%', opts;
 	for i in 1 .. opts
 		loop
-			raise notice 'variadic[%]:%', i, $6[i]; 
+--			raise notice 'variadic[%]:%', i, $6[i]; 
 			insert into prereq(course_code, term, prereq)
 				values($1, $3, $6[i] );
 		end loop;
@@ -262,19 +243,16 @@ begin
 	insert into faculty(f_name)
 		values($4);
 	select faculty.f_id into instructor_id from faculty where faculty.f_name = $4;
-	raise notice 'Instructor insertion:%', instructor_id;
+--	raise notice 'Instructor insertion:%', instructor_id;
 	insert into courses(course_code)
 		values($1);
-	raise notice 'Course insertion:%', $1;
+--	raise notice 'Course insertion:%', $1;
 
 	insert into offering(course_code, course_name, term, f_id, max_cap)
 		values($1, $2, $3, instructor_id, $5);
 end 
 $BODY$
 language plpgsql;
-
-
-
 
 
 
@@ -304,18 +282,13 @@ begin
 		then
 			raise exception 'Cannot drop enrollment, grade[%] has been assigned to % - %', grade_assigned, $2, $4;
 		else
-			raise notice 'Dropping enrollment: % - % - %:%', $2, $3, $4, $5;
+--			raise notice 'Dropping enrollment: % - % - %:%', $2, $3, $4, $5;
 			delete from enrolled where enrolled.s_id = $2 and enrolled.course_code = $4 and enrolled.term = $5;
 		end if;
 	end if;
 end
 $BODY$
 language plpgsql;
-
-
-
-
-
 
 --grades()--
 create or replace function insert_grades(course varchar, term varchar, student_id varchar, grade integer)
@@ -330,6 +303,73 @@ language plpgsql;
 
 
 
+--Enrolled insertion, 
+create or replace function enrolled_validations()
+returns trigger as
+$BODY$
+declare
+	cp record;
+	grade_assigned integer;
+begin 
+	if (select count(*)
+			from enrolled
+			where s_id = new.s_id and course_code = new.course_code and term = new.term) > 0
+	then
+		return null;
+	end if;
+	--no prerequisites--
+	if (select count(*)
+			from prereq
+			where course_code = new.course_code and term = new.term) = 0
+	then
+--		raise notice 'No prerequisite %:% - %', new.course_code, new.term, new.s_id;
+		return new;
+	else
+		for cp in select * from prereq
+					where course_code = new.course_code and term = new.term
+		loop
+			raise notice'';
+			raise notice 'LOOPING PREREQ wants:%:% preeq:% - %', cp.course_code, cp.term, cp.prereq, new.s_id;
+			if (select count(*) from enrolled 
+					where enrolled.s_id = new.s_id 
+						and enrolled.course_code = cp.prereq
+						and enrolled.term < new.term) > 0	
+			then
+				raise notice 'Mtf was enrolled, checking grade... prereq:% - %', cp.prereq, new.s_id;
+				select (select grade from grades
+							where grades.s_id = new.s_id 
+								and grades.course_code = cp.prereq
+								and grades.term < new.term)
+				into grade_assigned;
+				if
+					grade_assigned is NULL or grade_assigned >= 50	
+				then
+					raise notice 'grade >= 50 or null - OK insert % - % - grade:%', cp.course_code, new.s_id, grade_assigned;
+					return new;
+				else
+					raise notice 'grade assigned or < 50 - ABORT insert % - % - grade:%', cp.course_code, new.s_id, grade_assigned;
+					return null;
+				end if;
+
+			else
+				raise notice 'sad mtf doesnt have the :( % - %', cp.prereq, new.s_id;
+				return null;
+			end if;
+
+		end loop;
+	end if;
+	
+
+return new;
+end 
+$BODY$
+language plpgsql;
+
+create trigger enrolled_validations_trigger
+	before insert on enrolled
+	for each row
+	execute procedure enrolled_validations();
+
 select insert_courses('CSC 110','Fundamentals of Programming: I', '201709' ,'Jens Weber', '200');
 select insert_courses('CSC 110','Fundamentals of Programming: I', '201801' ,'LillAnne Jackson', '150');
 select insert_courses('CSC 115','Fundamentals of Programming: II', '201709', 'Tibor van Rooij', '100', 'CSC 110');
@@ -340,6 +380,7 @@ select insert_courses('CSC 225','Algorithms and Data Structures: I', '201805', '
 
 
 select insert_add_drop ('ADD', 'V00123456', 'Alastair Avocado', 'CSC 110', '201709');
+select insert_grades ('CSC 110', '201709', 'V00123456', '50');
 select insert_add_drop ('ADD', 'V00123456', 'Alastair Avocado', 'CSC 115', '201801');
 select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 110', '201709');
 select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 115', '201801');
@@ -352,7 +393,7 @@ select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 225', '201
 select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 225', '201805');
 --droping with grade assigned
 --select insert_grades ('CSC 110', '201709', 'V00123456', '80');
-select insert_add_drop ('DROP', 'V00123456', 'Alastair Avocado','CSC 110','201709');
+--select insert_add_drop ('DROP', 'V00123456', 'Alastair Avocado','CSC 110','201709');
 
 
 --select insert_grades ('CSC 110', '201709', 'V00123457', '80');
