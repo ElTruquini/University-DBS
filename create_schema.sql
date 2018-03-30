@@ -22,7 +22,8 @@ drop trigger if exists faculty_ignore_duplicates_trigger on faculty;
 drop function if exists insert_grades(course varchar, term varchar, student_id varchar, grade integer);
 drop function if exists enrolled_validations();
 drop trigger if exists enrolled_validations_trigger on enrolled;
-
+drop function if exists enrolled_check_capacity();
+drop trigger if exists enrolled_check_capacity_trigger on enrolled;
 
 -- create Student table --
 create table students(
@@ -373,7 +374,7 @@ create trigger enrolled_validations_trigger
 select insert_courses('CSC 110','Fundamentals of Programming: I', '201709' ,'Jens Weber', '200');
 select insert_courses('CSC 110','Fundamentals of Programming: I', '201801' ,'LillAnne Jackson', '150');
 select insert_courses('CSC 115','Fundamentals of Programming: II', '201709', 'Tibor van Rooij', '100', 'CSC 110');
-select insert_courses('CSC 115','Fundamentals of Programming: II', '201801', 'Mike Zastre', '200', 'CSC 110');
+select insert_courses('CSC 115','Fundamentals of Programming: II', '201801', 'Mike Zastre', '100', 'CSC 110');
 select insert_courses('MATH 122','Logic and Fundamentals', '201709', 'Gary McGillivray', '100');
 select insert_courses('MATH 122','Logic and Fundamentals', '201801', 'Gary McGillivray', '100');
 select insert_courses('CSC 225','Algorithms and Data Structures: I', '201805', 'Bill Bird', '100', 'CSC 115', 'MATH 122');
