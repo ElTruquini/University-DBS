@@ -1,4 +1,4 @@
---Written by:Daniel Olaya Moran, V00855054
+--Written by:Daniel Olaya
 
 -- Issue a pre-emptive rollback (to discard the effect of any active transaction) --
 rollback;
@@ -370,35 +370,3 @@ create trigger enrolled_validations_trigger
 	before insert on enrolled
 	for each row
 	execute procedure enrolled_validations();
-
-select insert_courses('CSC 110','Fundamentals of Programming: I', '201709' ,'Jens Weber', '200');
-select insert_courses('CSC 110','Fundamentals of Programming: I', '201801' ,'LillAnne Jackson', '150');
-select insert_courses('CSC 115','Fundamentals of Programming: II', '201709', 'Tibor van Rooij', '100', 'CSC 110');
-select insert_courses('CSC 115','Fundamentals of Programming: II', '201801', 'Mike Zastre', '100', 'CSC 110');
-select insert_courses('MATH 122','Logic and Fundamentals', '201709', 'Gary McGillivray', '100');
-select insert_courses('MATH 122','Logic and Fundamentals', '201801', 'Gary McGillivray', '100');
-select insert_courses('CSC 225','Algorithms and Data Structures: I', '201805', 'Bill Bird', '100', 'CSC 115', 'MATH 122');
-
-
-select insert_add_drop ('ADD', 'V00123456', 'Alastair Avocado', 'CSC 110', '201709');
-select insert_grades ('CSC 110', '201709', 'V00123456', '50');
-select insert_add_drop ('ADD', 'V00123456', 'Alastair Avocado', 'CSC 115', '201801');
-select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 110', '201709');
-select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 115', '201801');
-select insert_add_drop ('ADD', 'V00123456', 'Alastair Avocado', 'MATH 122', '201709');
-select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'MATH 122', '201801');
-select insert_add_drop ('ADD', 'V00123456', 'Alastair Avocado', 'CSC 225' ,'201805');
-select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 225', '201805');
---select insert_add_drop ('DROP', 'V00123456', 'Alastair Avocado','CSC 110','201709');
---duplicate--
-select insert_add_drop ('ADD', 'V00123457', 'Rebecca Raspberry', 'CSC 225', '201805');
---droping with grade assigned
---select insert_grades ('CSC 110', '201709', 'V00123456', '80');
---select insert_add_drop ('DROP', 'V00123456', 'Alastair Avocado','CSC 110','201709');
-
-
---select insert_grades ('CSC 110', '201709', 'V00123457', '80');
---select insert_grades ('MATH 122', '201709', 'V00123456', '67');
---select insert_grades ('CSC 225', '201805', 'V00123457', '75');
---select insert_grades ('CSC 225', '201805', 'V00123456', '79');
---select insert_grades ('CSC 115', '201801', 'V00123456', '83');
